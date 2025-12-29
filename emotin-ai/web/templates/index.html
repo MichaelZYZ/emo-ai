@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>云心AI情绪分析</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>云心AI情绪分析</h1>
+        <form id="analyze-form" enctype="multipart/form-data">
+            <label for="text">输入文本：</label>
+            <input type="text" id="text" name="text" placeholder="请输入要分析的文本...">
+
+            <label for="audio">上传音频文件：</label>
+            <input type="file" id="audio" name="audio" accept="audio/*">
+
+            <label for="image">上传图片文件：</label>
+            <input type="file" id="image" name="image" accept="image/*">
+
+            <button type="submit">分析</button>
+        </form>
+        <div class="result" id="result"></div>
+    </div>
+    <script>
+    document.getElementById('analyze-form').onsubmit = async function(e) {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        document.getElementById('result').innerText = '分析中...';
+        const res = await fetch('/analyze', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await res.json();
+        document.getElementById('result').innerText = data.result || data.error || '分析失败';
+    };
+    </script>
+</body>
+</html>
