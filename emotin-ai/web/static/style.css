@@ -119,6 +119,42 @@ body {
     padding: 8px;
 }
 
+.camera-device-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.camera-device-row label {
+    color: #445b85;
+    font-size: 0.88rem;
+    font-weight: 600;
+}
+
+.camera-device-row select {
+    flex: 1;
+    border: 1px solid #c8d6ee;
+    border-radius: 8px;
+    padding: 6px 8px;
+    color: #2a3f66;
+    background: #fff;
+}
+
+.camera-device-row button {
+    border: 1px solid #b8caec;
+    border-radius: 8px;
+    background: #fff;
+    color: #355185;
+    font-weight: 600;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+.camera-device-row button:hover {
+    background: #edf3ff;
+}
+
 #camera-preview {
     width: 100%;
     max-height: 180px;
