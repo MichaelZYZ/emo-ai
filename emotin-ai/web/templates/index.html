@@ -6,34 +6,81 @@
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>云心AI情绪分析</h1>
-        <form id="analyze-form" enctype="multipart/form-data">
-            <label for="text">输入文本：</label>
-            <input type="text" id="text" name="text" placeholder="请输入要分析的文本...">
+    <div class="chat-shell">
+        <div class="chat-header">
+            <div class="avatar">云</div>
+            <div class="title-group">
+                <h1>云心AI情绪助手</h1>
+                <p>像 QQ 聊天窗口一样，边聊边分析情绪</p>
+            </div>
+        </div>
 
-            <label for="audio">上传音频文件：</label>
-            <input type="file" id="audio" name="audio" accept="audio/*">
+        <div class="chat-window" id="chat-window">
+            <div class="message ai">
+                <div class="bubble">你好，我是云心AI 👋<br>你可以输入文本，并可选上传语音/图片，我会回复综合情绪分析。</div>
+            </div>
+        </div>
 
-            <label for="image">上传图片文件：</label>
-            <input type="file" id="image" name="image" accept="image/*">
+        <form id="analyze-form" class="chat-input" enctype="multipart/form-data">
+            <div class="file-row">
+                <label for="audio">语音</label>
+                <input type="file" id="audio" name="audio" accept="audio/*">
 
-            <button type="submit">分析</button>
+                <label for="image">图片</label>
+                <input type="file" id="image" name="image" accept="image/*">
+            </div>
+            <div class="send-row">
+                <input type="text" id="text" name="text" placeholder="请输入消息，例如：我今天有点焦虑..." autocomplete="off">
+                <button type="submit">发送</button>
+            </div>
         </form>
-        <div class="result" id="result"></div>
     </div>
     <script>
+    function appendMessage(role, text) {
+        const chatWindow = document.getElementById('chat-window');
+        const wrapper = document.createElement('div');
+        wrapper.className = `message ${role}`;
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        wrapper.appendChild(bubble);
+        chatWindow.appendChild(wrapper);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
     document.getElementById('analyze-form').onsubmit = async function(e) {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
-        document.getElementById('result').innerText = '分析中...';
+
+        const text = (document.getElementById('text').value || '').trim();
+        const audio = document.getElementById('audio').files[0];
+        const image = document.getElementById('image').files[0];
+
+        if (!text && !audio && !image) {
+            appendMessage('ai', '请至少输入文本，或上传语音/图片后再发送。');
+            return;
+        }
+
+        let userText = text || '（未输入文本）';
+        if (audio) userText += `\n[语音: ${audio.name}]`;
+        if (image) userText += `\n[图片: ${image.name}]`;
+        appendMessage('user', userText);
+        appendMessage('ai', '分析中，请稍候...');
+
         const res = await fetch('/analyze', {
             method: 'POST',
             body: formData
         });
         const data = await res.json();
-        document.getElementById('result').innerText = data.result || data.error || '分析失败';
+        const chatWindow = document.getElementById('chat-window');
+        const pending = chatWindow.querySelector('.message.ai:last-child .bubble');
+        if (pending && pending.textContent.includes('分析中')) {
+            pending.textContent = data.result || data.error || '分析失败';
+        } else {
+            appendMessage('ai', data.result || data.error || '分析失败');
+        }
+        form.reset();
     };
     </script>
 </body>

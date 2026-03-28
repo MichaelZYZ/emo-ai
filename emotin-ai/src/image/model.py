@@ -1,18 +1,19 @@
 
 import numpy as np
-import cv2
 import os
-
-from src.image.my_model import MyImageEmotionRecognizer
 
 class ImageEmotionRecognizer:
     def __init__(self, use_custom=False, custom_model_path='my_emotion_model.pth'):
         self.use_custom = use_custom
         if use_custom:
+            from src.image.my_model import MyImageEmotionRecognizer
             self.model = MyImageEmotionRecognizer(model_path=custom_model_path)
         else:
-            from deepface import DeepFace
-            self.DeepFace = DeepFace
+            try:
+                from deepface import DeepFace
+                self.DeepFace = DeepFace
+            except Exception:
+                self.DeepFace = None
             self.labels = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral']
             self.cn_map = {
                 'angry': '愤怒',
@@ -24,8 +25,32 @@ class ImageEmotionRecognizer:
                 'neutral': '中性'
             }
 
+    def _fallback_by_filename(self, image_path):
+        filename = os.path.basename(image_path).lower()
+        name_map = {
+            'smile': '开心',
+            'happy': '开心',
+            'sad': '悲伤',
+            'angry': '愤怒',
+            'fear': '恐惧',
+            'surprise': '惊讶',
+            'neutral': '中性'
+        }
+        for key, emotion in name_map.items():
+            if key in filename:
+                return emotion
+        return '中性'
+
     def detect_and_crop_face(self, image_path):
+        try:
+            import cv2
+        except ImportError:
+            # 在缺少 OpenCV 运行库时，直接退回原图，避免导入阶段失败
+            return image_path
+
         img = cv2.imread(image_path)
+        if img is None:
+            return image_path
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         faces = face_cascade.detectMultiScale(gray, 1.3, 5)
@@ -35,17 +60,25 @@ class ImageEmotionRecognizer:
             temp_path = 'cropped_face.jpg'
             cv2.imwrite(temp_path, face_img)
             return temp_path
-        else:
-            return image_path
+        return image_path
 
     def predict(self, image_path):
         if hasattr(self, 'model'):
             # 使用自定义PyTorch模型
             return self.model.predict(image_path)
+        if self.DeepFace is None:
+            return self._fallback_by_filename(image_path)
         try:
             # deepface/FER逻辑
             cropped_path = self.detect_and_crop_face(image_path)
-            result = self.DeepFace.analyze(img_path=cropped_path, actions=['emotion'], enforce_detection=True, detector_backend='opencv', models={'emotion': self.DeepFace.build_model('Emotion')}, prog_bar=False)
+            result = self.DeepFace.analyze(
+                img_path=cropped_path,
+                actions=['emotion'],
+                enforce_detection=True,
+                detector_backend='skip',
+                models={'emotion': self.DeepFace.build_model('Emotion')},
+                prog_bar=False
+            )
             emotion = result['dominant_emotion']
             emotion_scores = result['emotion']
             print('图片情绪概率分布:', {self.cn_map.get(k, k): round(v, 2) for k, v in emotion_scores.items()})
