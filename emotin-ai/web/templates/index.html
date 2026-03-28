@@ -29,6 +29,15 @@
                 <label for="image">图片</label>
                 <input type="file" id="image" name="image" accept="image/*">
             </div>
+            <div class="camera-row">
+                <video id="camera-preview" autoplay playsinline muted></video>
+                <canvas id="camera-canvas"></canvas>
+                <div class="camera-actions">
+                    <button type="button" id="open-camera">打开摄像头</button>
+                    <button type="button" id="capture-face">拍照识别</button>
+                    <button type="button" id="close-camera">关闭摄像头</button>
+                </div>
+            </div>
             <div class="send-row">
                 <input type="text" id="text" name="text" placeholder="请输入消息，例如：我今天有点焦虑..." autocomplete="off">
                 <button type="submit">发送</button>
@@ -48,6 +57,55 @@
         chatWindow.scrollTop = chatWindow.scrollHeight;
     }
 
+    let cameraStream = null;
+    let capturedImageBlob = null;
+    const video = document.getElementById('camera-preview');
+    const canvas = document.getElementById('camera-canvas');
+
+    async function openCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            appendMessage('ai', '当前浏览器不支持摄像头调用。');
+            return;
+        }
+        try {
+            cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            video.srcObject = cameraStream;
+            appendMessage('ai', '摄像头已开启，请调整角度后点击“拍照识别”。');
+        } catch (err) {
+            appendMessage('ai', `无法打开摄像头：${err.message || err}`);
+        }
+    }
+
+    function closeCamera() {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            cameraStream = null;
+            video.srcObject = null;
+            appendMessage('ai', '摄像头已关闭。');
+        }
+    }
+
+    function captureFace() {
+        if (!cameraStream) {
+            appendMessage('ai', '请先打开摄像头。');
+            return;
+        }
+        const width = video.videoWidth || 640;
+        const height = video.videoHeight || 480;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+            capturedImageBlob = blob;
+            appendMessage('ai', '已捕捉当前人脸画面，发送后将参与情绪分析。');
+        }, 'image/jpeg', 0.92);
+    }
+
+    document.getElementById('open-camera').onclick = openCamera;
+    document.getElementById('close-camera').onclick = closeCamera;
+    document.getElementById('capture-face').onclick = captureFace;
+
     document.getElementById('analyze-form').onsubmit = async function(e) {
         e.preventDefault();
         const form = e.target;
@@ -57,14 +115,22 @@
         const audio = document.getElementById('audio').files[0];
         const image = document.getElementById('image').files[0];
 
-        if (!text && !audio && !image) {
-            appendMessage('ai', '请至少输入文本，或上传语音/图片后再发送。');
+        if (capturedImageBlob) {
+            formData.set('image', capturedImageBlob, `camera_capture_${Date.now()}.jpg`);
+        }
+
+        if (!text && !audio && !image && !capturedImageBlob) {
+            appendMessage('ai', '请至少输入文本，或上传语音/图片，或拍照后再发送。');
             return;
         }
 
         let userText = text || '（未输入文本）';
         if (audio) userText += `\n[语音: ${audio.name}]`;
-        if (image) userText += `\n[图片: ${image.name}]`;
+        if (capturedImageBlob) {
+            userText += `\n[图片: 摄像头拍照]`;
+        } else if (image) {
+            userText += `\n[图片: ${image.name}]`;
+        }
         appendMessage('user', userText);
         appendMessage('ai', '分析中，请稍候...');
 
@@ -80,6 +146,7 @@
         } else {
             appendMessage('ai', data.result || data.error || '分析失败');
         }
+        capturedImageBlob = null;
         form.reset();
     };
     </script>
